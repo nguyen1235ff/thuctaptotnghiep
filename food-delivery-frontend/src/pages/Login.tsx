@@ -22,9 +22,20 @@ export default function Login() {
       // Lưu token vào localStorage để duy trì trạng thái đăng nhập
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('username', response.username);
+      // Lưu thêm roles dưới dạng chuỗi JSON để đồng bộ phân quyền hệ thống
+      localStorage.setItem('roles', JSON.stringify(response.roles));
       
-      // Đăng nhập thành công -> Đá người dùng về Trang chủ công việc
-      navigate('/');
+      // ĐIỀU HƯỚNG THÔNG MINH DỰA TRÊN QUYỀN (ROLE) ĐÃ CẬP NHẬT
+      if (response.roles && response.roles.includes('ROLE_ADMIN')) {
+        // Nếu là Admin hệ thống -> Điều hướng tới admindashboard
+        navigate('/admin');
+      } else if (response.roles && response.roles.includes('ROLE_OWNER')) {
+        // Nếu là Chủ nhà hàng -> Điều hướng tới restaurantdashboard
+        navigate('/restaurant');
+      } else {
+        // Khách hàng thông thường (ROLE_USER) hoặc các vai trò khác -> Về trang chủ
+        navigate('/');
+      }
     } catch (error: any) {
       setErrorMessage(error.message || '❌ Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản, mật khẩu!');
     } finally {
@@ -34,87 +45,87 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
-      
-      {/* Nút quay lại trang chủ nhanh nằm góc trên */}
+      {/* Nút quay lại trang chủ góc trên bên trái */}
       <button 
         onClick={() => navigate('/')}
-        className="absolute top-6 left-6 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-orange-500 transition-colors cursor-pointer"
+        className="absolute top-6 left-6 flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
       >
-        <ArrowLeft className="w-4 h-4" /> Quay lại trang chủ
+        <ArrowLeft className="w-4 h-4" />
+        Quay lại trang chủ
       </button>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <h2 className="text-3xl font-black text-slate-800 tracking-tight">
-          Chào mừng bạn trở lại 👋
+      <div className="sm:mx-auto w-full sm:max-w-md">
+        <div className="flex justify-center text-3xl">🚀</div>
+        <h2 className="mt-4 text-center text-2xl font-black text-slate-800 tracking-tight">
+          Chào mừng bạn quay trở lại!
         </h2>
-        <p className="mt-2 text-sm text-slate-400">
-          Khám phá và đặt ngay những món ăn yêu thích của bạn
+        <p className="mt-1 text-center text-xs text-slate-400 font-medium">
+          Khám phá và đặt hàng nghìn món ăn ngon tại Ho Chi Minh City
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <div className="bg-white py-8 px-6 border border-slate-100 shadow-sm rounded-2xl sm:px-10">
+      <div className="mt-8 sm:mx-auto w-full sm:max-w-md px-4 sm:px-0">
+        <div className="bg-white py-8 px-6 border border-slate-100 rounded-3xl shadow-xs sm:px-10">
           
-          {/* Khối hiển thị thông báo lỗi nếu đăng nhập sai */}
+          {/* Thông báo lỗi nếu có */}
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-medium text-red-600">
+            <div className="mb-5 bg-red-50 text-red-600 p-3 rounded-xl text-xs font-bold border border-red-100 animate-fadeIn">
               {errorMessage}
             </div>
           )}
 
           <form className="space-y-5" onSubmit={handleLogin}>
-            {/* Ô nhập Tên đăng nhập (Username) */}
+            {/* Tên đăng nhập */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Tên đăng nhập
+                Tài khoản đăng nhập
               </label>
-              <div className="relative rounded-xl shadow-xs">
+              <div className="relative">
                 <input
                   type="text"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Nhập username của bạn..."
-                  className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:border-orange-500 text-slate-700 font-medium"
+                  placeholder="Nhập tên đăng nhập hoặc email..."
+                  className="w-full bg-slate-50 text-slate-800 pl-10 pr-4 py-3 rounded-xl text-xs font-bold border-2 border-transparent focus:border-orange-500 focus:bg-white focus:outline-none placeholder-slate-400 transition-all"
                 />
                 <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               </div>
             </div>
 
-            {/* Ô nhập Mật khẩu (Password) */}
+            {/* Mật khẩu */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Mật khẩu
+                Mật khẩu bảo mật
               </label>
-              <div className="relative rounded-xl shadow-xs">
+              <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-50 border border-slate-200 pl-10 pr-10 py-3 rounded-xl text-sm focus:outline-none focus:border-orange-500 text-slate-700 font-medium"
+                  placeholder="Nhập mật khẩu của bạn..."
+                  className="w-full bg-slate-50 text-slate-800 pl-10 pr-10 py-3 rounded-xl text-xs font-bold border-2 border-transparent focus:border-orange-500 focus:bg-white focus:outline-none placeholder-slate-400 transition-all"
                 />
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                
-                {/* Nút bấm ẩn/hiện mật khẩu dạng icon mắt */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
-            {/* Khối Ghi nhớ thông tin & Quên mật khẩu */}
+            {/* Ghi nhớ & Quên mật khẩu */}
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center">
                 <input
                   id="remember-me"
+                  name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-orange-500 border-slate-300 rounded-sm focus:ring-orange-400"
+                  className="h-4 w-4 text-orange-500 focus:ring-orange-400 border-slate-300 rounded-sm"
                 />
                 <label htmlFor="remember-me" className="ml-2 text-slate-500 font-medium select-none">
                   Ghi nhớ đăng nhập
@@ -146,7 +157,7 @@ export default function Login() {
           <div className="mt-6 text-center text-xs text-slate-400 font-medium">
             Chưa có tài khoản?{' '}
             <Link to="/register" className="font-bold text-orange-500 hover:text-orange-600">
-              Đăng ký ngay
+              Đăng ký ngay tại đây
             </Link>
           </div>
 

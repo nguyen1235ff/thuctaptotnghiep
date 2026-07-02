@@ -37,7 +37,7 @@ export default function App() {
         {/* ============================================================== */}
         {/* TUYẾN ĐƯỜNG DÀNH CHO ROLE RESTAURANT (CHỦ CỬA HÀNG)           */}
         {/* ============================================================== */}
-        <Route path="/restaurant/dashboard" element={<RestaurantDashboard />} />
+        <Route path="/restaurant" element={<RestaurantDashboard />} />
 
         {/* Nếu gõ bậy đường dẫn, tự động đá về Trang Chủ */}
           <Route path="*" element={<Navigate to="/" replace />} />

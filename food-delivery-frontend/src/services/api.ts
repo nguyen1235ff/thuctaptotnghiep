@@ -1,8 +1,6 @@
 import axios from 'axios';
 
-// Định nghĩa URL gốc của Spring Boot backend. 
-// Lưu ý: Nếu trong file application.yml bạn có đặt context-path (ví dụ: /api), hãy sửa lại thành 'http://localhost:8080/api'
-const API_BASE_URL = 'http://localhost:8080'; 
+const API_BASE_URL = 'http://localhost:8080/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

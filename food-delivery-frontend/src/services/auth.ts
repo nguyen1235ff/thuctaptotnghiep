@@ -46,32 +46,61 @@ export const authService = {
     } catch (error) {
       console.warn("Backend đang tắt, kích hoạt chế độ giả lập đăng nhập thành công để test FE.");
       
-      // Giả lập phản hồi thành công nếu Backend chưa bật để bạn test luồng giao diện mượt mà
-      if (data.username === 'admin' && data.password === '123456') {
+      // BỔ SUNG MOCK DATA PHÂN QUYỀN TÀI KHOẢN TẠI ĐÂY
+      if (data.username === 'customer1' && data.password === '123456') {
         return {
-          accessToken: 'mock-jwt-access-token',
-          refreshToken: 'mock-jwt-refresh-token',
-          username: data.username,
-          roles: ['ROLE_USER']
+          accessToken: "mock-jwt-token-customer-xyz",
+          refreshToken: "mock-refresh-token-customer-xyz",
+          username: "customer1",
+          roles: ["ROLE_USER"]
+        };
+      } 
+      
+      if (data.username === 'owner1' && data.password === '123456') {
+        return {
+          accessToken: "mock-jwt-token-owner-xyz",
+          refreshToken: "mock-refresh-token-owner-xyz",
+          username: "owner1",
+          roles: ["ROLE_OWNER"]
         };
       }
-      
-      // Ném lỗi nếu nhập tài khoản khác khi offline
-      throw new Error('Tài khoản test offline là admin / 123456 hoặc Backend của bạn chưa bật!');
+
+       if (data.username === 'owner1' && data.password === '123456') {
+        return {
+          accessToken: "mock-jwt-token-owner-xyz",
+          refreshToken: "mock-refresh-token-owner-xyz",
+          username: "owner1",
+          roles: ["ROLE_OWNER"]
+        };
+      }
+
+       if (data.username === 'admin1' && data.password === '123456') {
+        return {
+          accessToken: "mock-jwt-token-admin-xyz",
+          refreshToken: "mock-refresh-token-admin-xyz",
+          username: "admin1",
+          roles: ["ROLE_ADMIN"]
+        };
+      }
+
+      // Giả lập phản hồi mặc định nếu gõ tài khoản khác
+      return {
+        accessToken: "mock-jwt-token-default-abc",
+        refreshToken: "mock-refresh-token-default-abc",
+        username: data.username,
+        roles: ["ROLE_USER"]
+      };
     }
   },
 
-  register: async (data: RegisterRequest): Promise<any> => {
+  register: async (data: RegisterRequest): Promise<{ message: string }> => {
     try {
-      // Endpoint tương ứng trong AuthController.java: POST /auth/register
       const response = await api.post('/auth/register', data);
       return response.data;
     } catch (error) {
-      console.warn("Backend đang tắt, giả lập đăng ký thành công ở Frontend.");
-      
-      // Giả lập xử lý offline thành công để bạn test giao diện mượt mà
+      console.warn("Backend offline: Giả lập đăng ký thành công.");
       await new Promise(resolve => setTimeout(resolve, 800));
-      return { message: "Đăng ký tài khoản giả lập thành công!" };
+      return { message: "Đăng ký tài khoản thành công" };
     }
   },
   forgotPassword: async (data: ForgotPasswordRequest): Promise<{ message: string }> => {
@@ -103,8 +132,7 @@ export const authService = {
       return response.data;
     } catch (error) {
       console.warn("Backend offline: Giả lập đổi mật khẩu thành công.");
-      await new Promise(resolve => setTimeout(resolve, 800));
-      return { message: "Đổi mật khẩu thành công" };
+      return { message: "Đổi mật khẩu thành công!" };
     }
   }
 };

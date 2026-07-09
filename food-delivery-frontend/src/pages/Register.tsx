@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/auth';
-import { Lock, User, Mail, Phone, Info, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Lock, User, Mail, Phone, Info, Loader2, ArrowLeft, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 export default function Register() {
   const navigate = useNavigate();
   
-  // Các state quản lý các trường nhập liệu
+  // Các state quản lý các trường nhập liệu (Đã đồng bộ)
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [roleName, setRoleName] = useState('CUSTOMER'); // ✨ BỔ SUNG: Mặc định ban đầu là Khách hàng
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,13 +24,13 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // Gọi service đăng ký tài khoản mới
-      await authService.register({ username, password, email, fullName, phone });
+      // ✅ Đã sửa: Truyền đầy đủ trường roleName chuẩn hóa theo yêu cầu cấu trúc của RegisterRequest.java
+      await authService.register({ username, password, email, fullName, phone, roleName });
       
-      alert('🎉 Đăng ký tài khoản thành công! Hệ thống sẽ chuyển bạn sang trang Đăng nhập.');
-      navigate('/login'); // Chuyển hướng sang trang đăng nhập ngay
+      alert('🎉 Đăng ký tài khoản đối tác thành công! Hệ thống sẽ chuyển bạn sang trang Đăng nhập.');
+      navigate('/login'); 
     } catch (error: any) {
-      setErrorMessage(error.message || '❌ Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!');
+      setErrorMessage(error?.response?.data?.message || '❌ Đăng ký thất bại. Vui lòng kiểm tra lại thông tin tài khoản!');
     } finally {
       setIsLoading(false);
     }
@@ -67,6 +68,24 @@ export default function Register() {
 
           <form className="space-y-4" onSubmit={handleRegister}>
             
+            {/* Vai trò tài khoản */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Bạn tham gia với vai trò?
+              </label>
+              <div className="relative rounded-xl shadow-xs">
+                <select
+                  value={roleName}
+                  onChange={(e) => setRoleName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-orange-500 text-slate-700 font-black cursor-pointer"
+                >
+                  <option value="CUSTOMER">🛒 Khách hàng mua đồ ăn</option>
+                  <option value="RESTAURANT">🍳 Chủ nhà hàng đối tác gian hàng</option>
+                </select>
+                <ShieldCheck className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+
             {/* 1. Họ và tên */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -171,7 +190,7 @@ export default function Register() {
                 id="terms"
                 type="checkbox"
                 required
-                className="mt-0.5 h-4 w-4 text-orange-500 border-slate-300 rounded-sm focus:ring-orange-400"
+                className="mt-0.5 h-4 w-4 text-orange-500 border-slate-300 rounded-sm focus:ring-orange-400 cursor-pointer"
               />
               <label htmlFor="terms" className="ml-2 text-slate-500 font-medium select-none">
                 Tôi đồng ý với các <span className="text-orange-500 font-bold">Điều khoản sử dụng</span> và <span className="text-orange-500 font-bold">Chính sách bảo mật</span>.

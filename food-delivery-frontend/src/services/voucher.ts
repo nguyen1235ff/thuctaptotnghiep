@@ -14,7 +14,7 @@ export interface VoucherResponse {
   voucherId: number;
   voucherCode: string;
   description?: string;
-  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT' | string; // Khớp cấu trúc của trường dữ liệu BE
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT' | string; 
   discountValue: number;
   minOrderValue: number;
   maxUses?: number;
@@ -34,6 +34,7 @@ export interface VoucherRequest {
   maxUses?: number;
   startDate: string;
   endDate: string;
+  isActive?: boolean;
 }
 
 export const voucherService = {
@@ -43,21 +44,10 @@ export const voucherService = {
 
   // GET: /vouchers?page=...&size=...
   getAllAvailable: async (page = 0, size = 10): Promise<PageResponse<VoucherResponse>> => {
-    try {
-      const response = await api.get<PageResponse<VoucherResponse>>('/vouchers', {
-        params: { page, size }
-      });
-      return response.data;
-    } catch (error) {
-      console.warn("Chưa có API client, dùng Mock Data:");
-      return {
-        content: [
-          { voucherId: 1, voucherCode: "CHAOHE2026", description: "Giảm 20k cho đơn từ 100k", discountType: "FIXED_AMOUNT", discountValue: 20000, minOrderValue: 100000, usedCount: 5, startDate: "2026-06-01T00:00:00", endDate: "2026-08-30T23:59:59", isActive: true },
-          { voucherId: 2, voucherCode: "FREESHIP", description: "Giảm 15k cho đơn từ 50k", discountType: "FIXED_AMOUNT", discountValue: 15000, minOrderValue: 50000, usedCount: 12, startDate: "2026-06-01T00:00:00", endDate: "2026-07-15T23:59:59", isActive: true }
-        ],
-        totalPages: 1, totalElements: 2, size: 10, number: 0
-      };
-    }
+    const response = await api.get<PageResponse<VoucherResponse>>('/vouchers', {
+      params: { page, size }
+    });
+    return response.data;
   },
 
   // GET: /vouchers/{code}
@@ -72,21 +62,10 @@ export const voucherService = {
 
   // GET: /admin/vouchers?page=...&size=...
   getAllAdmin: async (page = 0, size = 20): Promise<PageResponse<VoucherResponse>> => {
-    try {
-      const response = await api.get<PageResponse<VoucherResponse>>('/admin/vouchers', {
-        params: { page, size }
-      });
-      return response.data;
-    } catch (error) {
-      console.warn("Chưa có API admin, dùng Mock Data:");
-      return {
-        content: [
-          { voucherId: 1, voucherCode: "CHAOHE2026", description: "Giảm 20k cho đơn từ 100k", discountType: "FIXED_AMOUNT", discountValue: 20000, minOrderValue: 100000, maxUses: 100, usedCount: 5, startDate: "2026-06-01T00:00", endDate: "2026-08-30T23:59", isActive: true },
-          { voucherId: 2, voucherCode: "FREESHIP", description: "Giảm 15k cho đơn từ 50k", discountType: "FIXED_AMOUNT", discountValue: 15000, minOrderValue: 50000, maxUses: 200, usedCount: 12, startDate: "2026-06-01T00:00", endDate: "2026-07-15T23:59", isActive: true }
-        ],
-        totalPages: 1, totalElements: 2, size: 20, number: 0
-      };
-    }
+    const response = await api.get<PageResponse<VoucherResponse>>('/admin/vouchers', {
+      params: { page, size }
+    });
+    return response.data;
   },
 
   // POST: /admin/vouchers
@@ -101,7 +80,6 @@ export const voucherService = {
     return response.data;
   },
 
-  
   // DELETE: /admin/vouchers/{id}
   delete: async (id: number): Promise<boolean> => {
     await api.delete(`/admin/vouchers/${id}`);

@@ -1,7 +1,7 @@
 import { api } from './api';
-import type { PageResponse } from './voucher'; // (PageResponse định nghĩa cấu trúc phân trang JPA)
+import type { PageResponse } from './voucher'; // Cấu trúc phân trang PageResponse { content: T[], totalPages: number, ... }
 
-// Ánh xạ cấu trúc từ UserResponse và User.java của Backend
+// Ánh xạ chính xác cấu trúc dữ liệu phản hồi từ UserResponse của Backend
 export interface UserResponse {
   userId: number;
   username: string;
@@ -13,13 +13,13 @@ export interface UserResponse {
   isActive: boolean;
 }
 
-// Định nghĩa Interface truyền vào khi đổi mật khẩu (khớp ChangePasswordRequest.java)
+// Interface truyền vào khi đổi mật khẩu (khớp ChangePasswordRequest.java)
 export interface ChangePasswordRequest {
   oldPassword: string;
   newPassword: string;
 }
 
-// Định nghĩa Interface truyền vào khi cập nhật Profile (khớp UpdateProfileRequest)
+// Interface truyền vào khi cập nhật thông tin cá nhân (khớp UpdateProfileRequest.java)
 export interface UpdateProfileRequest {
   fullName: string;
   phone?: string;
@@ -32,31 +32,16 @@ export const userService = {
   // 1. DÀNH CHO ADMIN (AdminController)
   // ==========================================
 
-  // GET: /admin/users?page=...&size=...
+  // Lấy toàn bộ danh sách người dùng hệ thống (Phân trang) - GET: /admin/users
   getAllUsersAdmin: async (page = 0, size = 20): Promise<PageResponse<UserResponse>> => {
-    try {
-      const response = await api.get<PageResponse<UserResponse>>('/admin/users', {
-        params: { page, size }
-      });
-      return response.data;
-    } catch (error) {
-      console.warn("Chưa kết nối được API Admin, trả về Mock Data danh sách User:");
-      return {
-        content: [
-          { userId: 1, username: "vinhnn", email: "vinh@gmail.com", fullName: "Nguyễn Ngọc Vinh", phone: "0901234567", address: "Phường Long Bình, TP. HCM", isActive: true },
-          { userId: 2, username: "khanhnd", email: "kha@gmail.com", fullName: "Nguyễn Hoàng Kha", phone: "0907654321", address: "Thành phố Hồ Chí Minh", isActive: false }
-        ],
-        totalPages: 1,
-        totalElements: 2,
-        size: 20,
-        number: 0
-      };
-    }
+    const response = await api.get<PageResponse<UserResponse>>('/admin/users', {
+      params: { page, size }
+    });
+    return response.data;
   },
 
-  // PUT: /admin/users/{id}/active?active=true/false
+  // Bật/Tắt trạng thái hoạt động của tài khoản người dùng - PUT: /admin/users/{id}/active?active=true/false
   toggleUserActive: async (id: number, active: boolean): Promise<UserResponse> => {
-    // Truyền tham số active qua Query Parameter theo thiết kế của @RequestParam
     const response = await api.put<UserResponse>(`/admin/users/${id}/active`, null, {
       params: { active }
     });
@@ -64,22 +49,22 @@ export const userService = {
   },
 
   // ==========================================
-  // 2. DÀNH CHO KHÁCH HÀNG / PROFILE CÁ NHÂN (UserController)
+  // 2. DÀNH CHO NGƯỜI DÙNG ĐĂNG NHẬP (UserController)
   // ==========================================
 
-  // GET: /users/profile
+  // Lấy thông tin chi tiết profile của tài khoản hiện tại - GET: /users/profile
   getProfile: async (): Promise<UserResponse> => {
     const response = await api.get<UserResponse>('/users/profile');
     return response.data;
   },
 
-  // PUT: /users/profile
+  // Cập nhật thông tin profile cá nhân - PUT: /users/profile
   updateProfile: async (data: UpdateProfileRequest): Promise<UserResponse> => {
     const response = await api.put<UserResponse>('/users/profile', data);
     return response.data;
   },
 
-  // PUT: /users/change-password
+  // Đổi mật khẩu tài khoản (Đã chuyển sang đúng UserController của BE) - PUT: /users/change-password
   changePassword: async (data: ChangePasswordRequest): Promise<void> => {
     await api.put('/users/change-password', data);
   }

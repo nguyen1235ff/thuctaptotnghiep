@@ -19,25 +19,22 @@ export default function Login() {
     try {
       const response = await authService.login({ username, password });
       
-      // Lưu token vào localStorage để duy trì trạng thái đăng nhập
+      // Đồng bộ lưu thông tin xác thực sạch sẽ vào bộ nhớ trình duyệt
       localStorage.setItem('accessToken', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken || '');
       localStorage.setItem('username', response.username);
-      // Lưu thêm roles dưới dạng chuỗi JSON để đồng bộ phân quyền hệ thống
       localStorage.setItem('roles', JSON.stringify(response.roles));
       
-      // ĐIỀU HƯỚNG THÔNG MINH DỰA TRÊN QUYỀN (ROLE) ĐÃ CẬP NHẬT
+      // ✅ Đã chuẩn hóa: Quét mảng chuỗi roles thực tế của máy chủ để điều hướng phân quyền
       if (response.roles && response.roles.includes('ROLE_ADMIN')) {
-        // Nếu là Admin hệ thống -> Điều hướng tới admindashboard
         navigate('/admin');
-      } else if (response.roles && response.roles.includes('ROLE_OWNER')) {
-        // Nếu là Chủ nhà hàng -> Điều hướng tới restaurantdashboard
+      } else if (response.roles && (response.roles.includes('ROLE_OWNER') || response.roles.includes('ROLE_RESTAURANT'))) {
         navigate('/restaurant');
       } else {
-        // Khách hàng thông thường (ROLE_USER) hoặc các vai trò khác -> Về trang chủ
         navigate('/');
       }
     } catch (error: any) {
-      setErrorMessage(error.message || '❌ Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản, mật khẩu!');
+      setErrorMessage(error?.response?.data?.message || '❌ Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản và mật khẩu!');
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +42,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
-      {/* Nút quay lại trang chủ góc trên bên trái */}
+      
       <button 
         onClick={() => navigate('/')}
         className="absolute top-6 left-6 flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
@@ -67,15 +64,13 @@ export default function Login() {
       <div className="mt-8 sm:mx-auto w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-white py-8 px-6 border border-slate-100 rounded-3xl shadow-xs sm:px-10">
           
-          {/* Thông báo lỗi nếu có */}
           {errorMessage && (
-            <div className="mb-5 bg-red-50 text-red-600 p-3 rounded-xl text-xs font-bold border border-red-100 animate-fadeIn">
+            <div className="mb-5 bg-red-50 text-red-600 p-3 rounded-xl text-xs font-bold border border-red-100">
               {errorMessage}
             </div>
           )}
 
           <form className="space-y-5" onSubmit={handleLogin}>
-            {/* Tên đăng nhập */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                 Tài khoản đăng nhập
@@ -86,14 +81,13 @@ export default function Login() {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Nhập tên đăng nhập hoặc email..."
+                  placeholder="Nhập tên đăng nhập của bạn..."
                   className="w-full bg-slate-50 text-slate-800 pl-10 pr-4 py-3 rounded-xl text-xs font-bold border-2 border-transparent focus:border-orange-500 focus:bg-white focus:outline-none placeholder-slate-400 transition-all"
                 />
                 <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               </div>
             </div>
 
-            {/* Mật khẩu */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                 Mật khẩu bảo mật
@@ -104,7 +98,7 @@ export default function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Nhập mật khẩu của bạn..."
+                  placeholder="Nhập mật khẩu..."
                   className="w-full bg-slate-50 text-slate-800 pl-10 pr-10 py-3 rounded-xl text-xs font-bold border-2 border-transparent focus:border-orange-500 focus:bg-white focus:outline-none placeholder-slate-400 transition-all"
                 />
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -118,7 +112,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Ghi nhớ & Quên mật khẩu */}
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center">
                 <input
@@ -136,11 +129,10 @@ export default function Login() {
               </a>
             </div>
 
-            {/* Nút Đăng Nhập */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer disabled:bg-orange-300 disabled:cursor-not-allowed"
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer disabled:bg-orange-300"
             >
               {isLoading ? (
                 <>
@@ -153,9 +145,8 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Dẫn link sang trang Đăng ký tài khoản mới */}
           <div className="mt-6 text-center text-xs text-slate-400 font-medium">
-            Chưa có tài khoản?{' '}
+            Chưaa có tài khoản?{' '}
             <Link to="/register" className="font-bold text-orange-500 hover:text-orange-600">
               Đăng ký ngay tại đây
             </Link>

@@ -13,7 +13,7 @@ export default function OrderHistory() {
   const [page, setPage] = useState(0);
   const size = 5; // Số lượng đơn hàng hiển thị trên mỗi trang
 
-  // 1. Gọi React Query lấy dữ liệu lịch sử đơn hàng theo Page hiện tại
+  // 1. CALL API: Lấy dữ liệu lịch sử đơn hàng thực tế của Customer theo phân trang
   const { data: paginationData, isLoading, isError } = useQuery({
     queryKey: ['orderHistory', page],
     queryFn: () => orderService.getHistory(page, size),
@@ -27,7 +27,7 @@ export default function OrderHistory() {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
 
-  // Hàm chuyển đổi format thời gian từ ISO String (Spring Boot) sang chuỗi trực quan
+  // Hàm chuyển đổi format thời gian từ trường createdAt thực tế của Backend
   const formatOrderDate = (dateStr: string) => {
     if (!dateStr) return '';
     try {
@@ -44,8 +44,8 @@ export default function OrderHistory() {
     }
   };
 
-  // Hàm helper render Badge trạng thái chuẩn xác theo enum Backend phát đi
-  const renderStatusBadge = (status: Order['status']) => {
+  // Hàm helper render Badge trạng thái theo chuẩn biến dữ liệu mới: orderStatus
+  const renderStatusBadge = (status: Order['orderStatus']) => {
     switch (status) {
       case 'PENDING':
         return <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-600 border border-amber-100 px-2.5 py-1 rounded-lg font-bold text-[11px]"><Clock className="w-3.5 h-3.5" /> Chờ duyệt</span>;
@@ -66,7 +66,6 @@ export default function OrderHistory() {
     }
   };
 
-  // Trạng thái Loading màn hình
   if (isLoading) {
     return (
       <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -76,14 +75,13 @@ export default function OrderHistory() {
     );
   }
 
-  // Trạng thái lỗi API
   if (isError) {
     return (
       <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <AlertCircle className="w-12 h-12 text-rose-500 mb-3" />
         <h3 className="font-bold text-slate-800 text-sm">Lỗi tải dữ liệu đơn hàng</h3>
-        <p className="text-xs text-slate-400 mt-1 mb-4">Không thể kết nối với hệ thống. Vui lòng kiểm tra lại kết nối mạng.</p>
-        <button onClick={() => navigate('/')} className="bg-slate-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl">
+        <p className="text-xs text-slate-400 mt-1 mb-4">Không thể kết nối với hệ thống hoặc phiên đăng nhập đã hết hạn.</p>
+        <button onClick={() => navigate('/')} className="bg-slate-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors cursor-pointer">
           Quay lại trang chủ
         </button>
       </div>
@@ -106,32 +104,36 @@ export default function OrderHistory() {
         </div>
       </div>
 
-      {/* DANH SÁCH ĐƠN HÀNG TRÊN VIEW */}
+      {/* DANH SÁCH ĐƠN HÀNG THỰC TẾ */}
       <div className="p-4 flex-1">
         {ordersList.length > 0 ? (
           <div className="space-y-4">
             {ordersList.map((order) => (
               <div 
                 key={order.orderId} 
-                onClick={() => navigate(`/orders/${order.orderId}`)} // Điều hướng đến chi tiết đơn nếu có route
+                onClick={() => navigate(`/customer/orders/${order.orderId}`)} // Điều hướng đến trang chi tiết đơn thực tế
                 className="bg-white border border-slate-100 rounded-2xl shadow-xs overflow-hidden active:scale-[0.99] transition-transform cursor-pointer"
               >
-                {/* Header đơn hàng: Tên Quán và Trạng thái */}
+                {/* Header: Tên Quán, Mã Đơn, Thời Gian, Trạng Thái */}
                 <div className="p-4 flex items-start justify-between gap-2 border-b border-slate-50">
-                  <div className="space-y-0.5">
+                  <div className="space-y-0.5 overflow-hidden">
                     <h3 className="font-black text-slate-800 text-sm line-clamp-1 flex items-center gap-1">
                       {order.restaurantName}
                       <ChevronRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                     </h3>
-                    <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                      <Calendar className="w-3 h-3" />
-                      <span>{formatOrderDate(order.orderDate)}</span>
+                    <div className="flex flex-col gap-0.5 font-medium text-[11px] text-slate-400">
+                      <span className="font-mono text-slate-500">Mã đơn: #{order.orderCode}</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Calendar className="w-3 h-3" />
+                        <span>{formatOrderDate(order.createdAt)}</span>
+                      </div>
                     </div>
                   </div>
-                  {renderStatusBadge(order.status)}
+                  {/* Sử dụng biến orderStatus mới */}
+                  {renderStatusBadge(order.orderStatus)}
                 </div>
 
-                {/* Danh sách các món ăn trong đơn hàng này */}
+                {/* Chi tiết các món ăn có trong đơn */}
                 <div className="p-4 bg-white space-y-3">
                   {order.items?.map((item, idx) => (
                     <div key={idx} className="flex items-center gap-3">
@@ -152,20 +154,21 @@ export default function OrderHistory() {
                           Số lượng: <span className="font-bold text-slate-600">{item.quantity}</span>
                         </p>
                       </div>
+                      {/* Đã sửa từ item.price sang item.unitPrice phù hợp với thực thể mới */}
                       <span className="text-xs font-bold text-slate-600 flex-shrink-0">
-                        {formatCurrency(item.price)}
+                        {formatCurrency(item.unitPrice)}
                       </span>
                     </div>
                   ))}
                 </div>
 
-                {/* Footer đơn hàng: Tổng tiền thanh toán */}
+                {/* Footer đơn hàng: Tổng tiền thanh toán dựa hoàn toàn trên DB */}
                 <div className="p-4 bg-slate-50/40 border-t border-slate-50 flex justify-between items-center text-xs">
                   <span className="text-slate-400 font-medium">
                     Thanh toán bằng: <strong className="text-slate-600 uppercase">{order.paymentMethod}</strong>
                   </span>
                   <div className="text-right">
-                    <span className="text-slate-400 font-medium">Tổng thanh toán: </span>
+                    <span className="text-slate-400 font-medium">Tổng thu: </span>
                     <span className="text-sm font-black text-orange-500 ml-1">
                       {formatCurrency(order.totalAmount)}
                     </span>
@@ -178,7 +181,7 @@ export default function OrderHistory() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <button
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  onClick={(e) => { e.stopPropagation(); setPage(p => Math.max(0, p - 1)); }}
                   disabled={page === 0}
                   className="px-3 py-1.5 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
@@ -188,7 +191,7 @@ export default function OrderHistory() {
                   Trang {page + 1} / {totalPages}
                 </span>
                 <button
-                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  onClick={(e) => { e.stopPropagation(); setPage(p => Math.min(totalPages - 1, p + 1)); }}
                   disabled={page >= totalPages - 1}
                   className="px-3 py-1.5 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
@@ -198,7 +201,7 @@ export default function OrderHistory() {
             )}
           </div>
         ) : (
-          /* Trạng thái trống nếu chưa từng đặt món */
+          /* Trạng thái trống nếu khách chưa từng đặt đơn nào trên hệ thống */
           <div className="text-center py-16 bg-white border border-slate-100 rounded-2xl shadow-xs">
             <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <h3 className="font-bold text-slate-700 text-sm">Bạn chưa có đơn hàng nào!</h3>

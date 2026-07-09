@@ -3,14 +3,15 @@ import type { ReactNode } from 'react';
 import type { Food } from '../services/food';
 import { api } from '../services/api';
 
-// Định nghĩa cấu trúc của một Item nằm trong giỏ hàng ở Client
 export interface CartItem {
+  cartItemId: number;
   foodId: number;
-  name: string;
-  price: number;
-  image: string;
+  foodName: string;
+  unitPrice: number;   // ✅ Đã sửa từ price -> unitPrice để khớp BE
+  totalPrice: number;  // ✅ Bổ sung thành tiền của riêng món này từ BE
   quantity: number;
   restaurantId: number;
+  imageUrl?: string;   // Nhận đường dẫn ảnh từ thực thể Food
 }
 
 interface CartContextType {
@@ -18,7 +19,8 @@ interface CartContextType {
   restaurantId: number | null;
   restaurantName: string | null;
   addToCart: (food: Food, resName: string) => Promise<void>;
-  removeFromCart: (foodId: number) => Promise<void>;
+  removeFromCart: (cartItemId: number) => Promise<void>; // Thay đổi tham số truyền vào thành cartItemId theo chuẩn DB
+  updateQuantity: (cartItemId: number, newQuantity: number) => Promise<void>; // Bổ sung hàm cập nhật số lượng chuẩn hóa
   clearCart: () => Promise<void>;
   getSubtotal: () => number;
   getTotalItems: () => number;
@@ -45,7 +47,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const [isLoadingCart, setIsLoadingCart] = useState(false);
 
-  // Lưu trạng thái xuống localStorage làm bộ nhớ đệm phụ (Offline Mock)
+  // Lưu trạng thái xuống localStorage làm bộ nhớ đệm phụ
   useEffect(() => {
     localStorage.setItem('food_delivery_cart', JSON.stringify(cartItems));
     if (restaurantId) localStorage.setItem('cart_restaurant_id', String(restaurantId));
@@ -55,115 +57,96 @@ export function CartProvider({ children }: { children: ReactNode }) {
     else localStorage.removeItem('cart_restaurant_name');
   }, [cartItems, restaurantId, restaurantName]);
 
-  // ĐỒNG BỘ: Tự động kéo giỏ hàng từ Backend về ngay khi ứng dụng khởi chạy (nếu BE online)
-  useEffect(() => {
-    const fetchBackendCart = async () => {
-      try {
-        setIsLoadingCart(true);
-        const response = await api.get('/cart'); // Gọi API GET /cart từ CartController.java
-        if (response.data && response.data.items) {
-          // Khớp cấu trúc trả về từ DB Backend về Client CartItem sử dụng đúng foodId
-          const backendItems: CartItem[] = response.data.items.map((item: any) => ({
-            foodId: item.food.foodId || item.food.id, // Đề phòng trường hợp DB mapping linh hoạt
-            name: item.food.name,
-            price: item.food.price,
-            image: item.food.image,
-            quantity: item.quantity,
-            restaurantId: item.food.restaurantId
-          }));
-          
-          if (backendItems.length > 0) {
-            setCartItems(backendItems);
-            setRestaurantId(backendItems[0].restaurantId);
-          }
-        }
-      } catch (error) {
-        console.warn("⚠️ Backend offline hoặc chưa đăng nhập. Sử dụng Giỏ hàng Mock từ LocalStorage.");
-      } finally {
-        setIsLoadingCart(false);
-      }
-    };
-
-    fetchBackendCart();
-  }, []);
-
-  // 1. THÊM MÓN VÀO GIỎ HÀNG (Sử dụng chuẩn food.foodId)
-  const addToCart = async (food: Food, resName: string) => {
-    let currentItems = [...cartItems];
-    
-    // Nếu đổi nhà hàng khác thì xóa sạch giỏ hàng cũ để tránh xung đột
-    if (restaurantId && restaurantId !== food.restaurantId) {
-      currentItems = [];
-      try {
-        await api.delete('/cart'); 
-      } catch (e) { /* Fallback */ }
-    }
-
-    const existingItem = currentItems.find((item) => item.foodId === food.foodId);
-    let newQuantity = 1;
-
-    if (existingItem) {
-      newQuantity = existingItem.quantity + 1;
-      setCartItems(prev => prev.map(item => item.foodId === food.foodId ? { ...item, quantity: newQuantity } : item));
-    } else {
-      setCartItems(prev => [...currentItems, {
-        foodId: food.foodId,
-        name: food.name,
-        price: food.price,
-        image: food.image,
-        quantity: 1,
-        restaurantId: food.restaurantId
-      }]);
-      setRestaurantId(food.restaurantId);
-      setRestaurantName(resName);
-    }
-
-    // Đẩy cập nhật lên DB Backend qua CartController
+  // ĐỒNG BỘ: Tự động kéo giỏ hàng thực tế từ Backend về ngay khi ứng dụng khởi chạy
+  const fetchBackendCart = async () => {
     try {
-      await api.post('/cart/items', {
-        foodId: food.foodId,
-        quantity: 1 // Tăng thêm 1 đơn vị
-      });
+      setIsLoadingCart(true);
+      const response = await api.get('/cart'); // Khớp API GET /cart từ Backend
+      if (response.data && response.data.items) {
+        setRestaurantId(response.data.restaurantId);
+        setRestaurantName(response.data.restaurantName);
+        
+        // ✅ Khớp chính xác cấu trúc trường dữ liệu từ CartItemResponse.java của Backend
+        const backendItems: CartItem[] = response.data.items.map((item: any) => ({
+          cartItemId: item.cartItemId,
+          foodId: item.foodId,
+          foodName: item.foodName,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          quantity: item.quantity,
+          restaurantId: response.data.restaurantId
+        }));
+        setCartItems(backendItems);
+      }
     } catch (error) {
-      console.warn("⚠️ Không đồng bộ được với DB Backend. Đã lưu món ở chế độ Offline Mock.");
+      console.warn("⚠️ Chưa đăng nhập hoặc hệ thống gặp sự cố. Sử dụng dữ liệu cục bộ.");
+    } finally {
+      setIsLoadingCart(false);
     }
   };
 
-  // 2. GIẢM SỐ LƯỢNG / XÓA KHỎI GIỎ HÀNG
-  const removeFromCart = async (foodId: number) => {
-    const existingItem = cartItems.find((item) => item.foodId === foodId);
-    if (!existingItem) return;
+  useEffect(() => {
+    fetchBackendCart();
+  }, []);
 
-    const targetQuantity = existingItem.quantity - 1;
+  // 1. THÊM MÓN MỚI VÀO GIỎ HÀNG (Khớp AddToCartRequest.java)
+  const addToCart = async (food: Food, resName: string) => {
+    // Nếu đổi sang đặt món ở nhà hàng khác, tự động xóa sạch giỏ hàng cũ trên Database trước
+    if (restaurantId && restaurantId !== food.restaurantId) {
+      try {
+        await api.delete('/cart');
+      } catch (e) { console.error(e); }
+      setCartItems([]);
+    }
 
-    if (targetQuantity <= 0) {
-      const updatedItems = cartItems.filter((item) => item.foodId !== foodId);
+    try {
+      // Gọi API POST /cart/items truyền dữ liệu lên body đúng chuẩn AddToCartRequest.java
+      await api.post('/cart/items', {
+        foodId: food.foodId,
+        quantity: 1
+      });
+      // Tải lại giỏ hàng mới từ Database để nhận cartItemId và số tiền chính xác từ Backend
+      await fetchBackendCart();
+    } catch (error) {
+      console.error("Lỗi đồng bộ thêm món ăn:", error);
+    }
+  };
+
+  // 2. CẬP NHẬT SỐ LƯỢNG MÓN ĂN TRONG GIỎ (Khớp chuẩn PUT /cart/items/{cartItemId}?quantity=...)
+  const updateQuantity = async (cartItemId: number, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      await removeFromCart(cartItemId);
+      return;
+    }
+
+    try {
+      // ✅ SỬA CHUẨN: Truyền dữ liệu qua Params và Path Variable theo đúng thiết kế Backend
+      await api.put(`/cart/items/${cartItemId}`, null, {
+        params: { quantity: newQuantity }
+      });
+      await fetchBackendCart();
+    } catch (error) {
+      console.error("Lỗi cập nhật số lượng món ăn:", error);
+    }
+  };
+
+  // 3. XÓA MỘT SẢN PHẨM KHỎI GIỎ HÀNG (DELETE /cart/items/{cartItemId})
+  const removeFromCart = async (cartItemId: number) => {
+    try {
+      await api.delete(`/cart/items/${cartItemId}`);
+      const updatedItems = cartItems.filter((item) => item.cartItemId !== cartItemId);
       setCartItems(updatedItems);
       if (updatedItems.length === 0) {
         setRestaurantId(null);
         setRestaurantName(null);
       }
-      
-      try {
-        await api.delete(`/cart/items/${foodId}`);
-      } catch (e) {
-        console.warn("⚠️ [Offline Mock] Đã xóa sản phẩm khỏi giỏ hàng Client.");
-      }
-    } else {
-      setCartItems(prev => prev.map(item => item.foodId === foodId ? { ...item, quantity: targetQuantity } : item));
-      
-      try {
-        await api.put('/cart/items', {
-          foodId: foodId,
-          quantity: targetQuantity
-        });
-      } catch (e) {
-        console.warn("⚠️ [Offline Mock] Đã cập nhật giảm số lượng trên Client.");
-      }
+      await fetchBackendCart();
+    } catch (error) {
+      console.error("Lỗi xóa món ăn khỏi giỏ hàng:", error);
     }
   };
 
-  // 3. XÓA SẠCH GIỎ HÀNG
+  // 4. XÓA SẠCH HOÀN TOÀN GIỎ HÀNG (DELETE /cart)
   const clearCart = async () => {
     setCartItems([]);
     setRestaurantId(null);
@@ -175,16 +158,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       await api.delete('/cart');
     } catch (error) {
-      console.warn("⚠️ [Offline Mock] Đã làm trống giỏ hàng Client.");
+      console.error("Lỗi làm trống giỏ hàng:", error);
     }
   };
 
-  // 4. HÀM TÍNH TỔNG TIỀN TẠM TÍNH
+  // 5. TÍNH TỔNG TIỀN TẠM TÍNH DỰA TRÊN TRƯỜNG unitPrice MỚI ĐỒNG BỘ
   const getSubtotal = () => {
-    return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+    return cartItems.reduce((total, item) => total + item.unitPrice * item.quantity, 0);
   };
 
-  // 5. HÀM ĐẾM TỔNG SỐ LƯỢNG ITEM ĐỂ ĐƯA LÊN BADGE
+  // 6. ĐẾM TỔNG SỐ LƯỢNG MÓN ĂN TRÊN BADGE NỔI GIAO DIỆN
   const getTotalItems = () => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
@@ -196,6 +179,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       restaurantName,
       addToCart,
       removeFromCart,
+      updateQuantity,
       clearCart,
       getSubtotal,
       getTotalItems,

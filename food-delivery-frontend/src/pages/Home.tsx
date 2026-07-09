@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { restaurantService } from '../services/restaurant';
-import { useCart } from '../context/CartContext';
+import { useCartStore } from '../store/useCartStore'; // Chuyển sang sử dụng Zustand Store thực tế
 import RestaurantCard from '../components/RestaurantCard';
 import { 
   Search, Loader2, ShoppingCart, User, LogIn, 
-  UserPlus, Utensils, Store, ArrowRight, LogOut 
+  UserPlus, Utensils, Store, ArrowRight, LogOut,
+  Flame, Award, Clock, Compass, ThumbsUp
 } from 'lucide-react';
 
 export default function Home() {
@@ -14,91 +15,105 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [username, setUsername] = useState<string | null>(null);
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('ALL');
 
-  // 1. Kiểm tra trạng thái đăng nhập từ localStorage giống như file Profile.tsx
+  // Lấy dữ liệu giỏ hàng thực tế từ Zustand Store kết nối Backend
+  const cart = useCartStore((state) => state.cart);
+  const fetchCart = useCartStore((state) => state.fetchCart);
+
+  // 1. Đồng bộ trạng thái đăng nhập tài khoản và nạp giỏ hàng thực tế tự động
   useEffect(() => {
     const savedUser = localStorage.getItem('username');
     if (savedUser) {
       setUsername(savedUser);
+      fetchCart(); // Nạp giỏ hàng từ DB Backend lên nếu đã đăng nhập
     }
-  }, []);
+  }, [fetchCart]);
 
-  // 2. Lấy thông tin giỏ hàng từ Context để làm nút Floating Giỏ hàng nhanh
-  const { cartItems } = useCart();
-  const totalCartQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  // Tính toán tổng số lượng món ăn thực tế đang có trong giỏ hàng tổng thể
+  const totalCartQuantity = Object.values(cart).reduce(
+    (sum, items) => sum + items.reduce((s, item) => s + item.quantity, 0), 0
+  );
 
-  // 3. ĐÃ SỬA CHUẨN: Gọi đúng tên hàm `getAllRestaurants` từ file restaurant.ts của bạn
+  // 2. CALL API: Lấy danh sách toàn bộ nhà hàng phân trang thực tế từ Backend
   const { data, isLoading, isError } = useQuery({
     queryKey: ['restaurants', page],
     queryFn: () => restaurantService.getAllRestaurants(page, 8),
     placeholderData: (previousData) => previousData 
   });
 
-  // Xử lý lọc danh sách nhà hàng theo từ khóa tìm kiếm (Search Term)
+  // Xử lý lọc danh sách nhà hàng động theo từ khóa người dùng nhập vào
   const filteredRestaurants = data?.content.filter(res => 
     res.restaurantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (res.description && res.description.toLowerCase().includes(searchTerm.toLowerCase()))
   ) || [];
 
-  // Giả lập danh sách món ăn gợi ý nhanh dựa vào chữ cái người dùng gõ
-  const showSuggestions = searchTerm.trim().length > 0;
-  const mockSuggestedFoods = [
-    { id: 101, name: 'Cơm Tấm Sườn Bì Chả', restaurant: 'Cơm Tấm Phúc Lộc Thọ' },
-    { id: 102, name: 'Canh Khổ Qua Nhồi Thịt', restaurant: 'Cơm Tấm Phúc Lộc Thọ' },
-    { id: 103, name: 'Trà Đá Chanh Sả', restaurant: 'Cơm Tấm Phúc Lộc Thọ' },
-  ].filter(food => food.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
+  // Xử lý đăng xuất triệt để xóa sạch bộ nhớ đệm an toàn
   const handleLogout = () => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('username');
+    localStorage.removeItem('roles');
+    useCartStore.getState().clearCart(); // Xóa trạng thái giỏ hàng local
     setUsername(null);
     navigate('/');
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 relative">
+    <div className="min-h-screen bg-slate-50/60 pb-20 font-sans">
       
-      {/* TOP NAVBAR: ĐĂNG NHẬP / ĐĂNG KÝ / PROFILE */}
-      <nav className="bg-white border-b border-slate-100 sticky top-0 z-40 px-6 py-3 shadow-xs">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      {/* HEADER TOP NAVBAR - THIẾT KẾ ĐỘC QUYỀN HIỆN ĐẠI */}
+      <nav className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-40 px-4 sm:px-6 py-3.5 shadow-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <span className="text-xl">🚀</span>
-            <span className="text-sm font-black tracking-tight text-slate-800 uppercase">
+            <div className="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-orange-500/20">🚀</div>
+            <span className="text-base font-black tracking-tight text-slate-800 uppercase">
               Food<span className="text-orange-500">Express</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* THANH TÌM KIẾM MINI TRÊN NAVBAR KHI CUỘN CHUỘT */}
+          <div className="hidden md:flex items-center relative w-96">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+              placeholder="Tìm quán ăn, món ngon vùng Long Bình..."
+              className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2 rounded-xl text-xs font-bold focus:outline-none focus:border-orange-500 transition-all placeholder:text-slate-400 text-slate-700"
+            />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          </div>
+
+          <div className="flex items-center gap-4">
             {username ? (
-              // Trạng thái: ĐÃ ĐĂNG NHẬP THÀNH CÔNG -> Nhấn vào chuyển sang trang /profile
               <div className="flex items-center gap-3">
                 <button 
                   onClick={() => navigate('/profile')}
-                  className="flex items-center gap-1.5 bg-slate-100 hover:bg-orange-50 border border-slate-200 text-slate-700 hover:text-orange-600 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer"
+                  className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm"
                 >
-                  <User className="w-3.5 h-3.5 text-orange-500" />
+                  <User className="w-3.5 h-3.5 text-orange-400" />
                   Hồ sơ: {username}
                 </button>
                 <button 
                   onClick={handleLogout}
-                  className="text-[11px] font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center gap-0.5 cursor-pointer"
+                  className="text-xs font-black text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1 cursor-pointer bg-slate-100 px-3 py-2 rounded-xl border"
                 >
-                  <LogOut className="w-3 h-3" /> Đăng xuất
+                  <LogOut className="w-3.5 h-3.5" /> Rời khỏi
                 </button>
               </div>
             ) : (
-              // Trạng thái: CHƯA ĐĂNG NHẬP
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => navigate('/login')}
-                  className="flex items-center gap-1 text-slate-600 hover:text-slate-900 font-bold text-xs px-3 py-1.5 transition-colors cursor-pointer"
+                  className="flex items-center gap-1 text-slate-600 hover:text-slate-900 font-black text-xs px-3 py-2 transition-colors cursor-pointer"
                 >
-                  <LogIn className="w-3.5 h-3.5" /> Đăng nhập
+                  Đăng nhập
                 </button>
                 <button 
                   onClick={() => navigate('/register')}
-                  className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white font-black text-xs px-3 py-1.5 rounded-xl shadow-xs transition-colors cursor-pointer"
+                  className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white font-black text-xs px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
-                  <UserPlus className="w-3.5 h-3.5" /> Đăng ký
+                  Đăng ký đối tác
                 </button>
               </div>
             )}
@@ -106,109 +121,117 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* BANNER & THANH TÌM KIẾM GỢI Ý MÓN ĂN */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-500 py-14 px-4 shadow-inner relative">
-        <div className="max-w-6xl mx-auto text-center text-white">
-          <h1 className="text-2xl md:text-4xl font-extrabold mb-3">🍔 Thèm gì là có - Giao ngay trong chớp mắt</h1>
-          <p className="text-orange-50 text-xs md:text-sm mb-8">Đặt món ăn trực tuyến từ các cửa hàng tại khu vực Long Bình & Thủ Đức.</p>
+      {/* HERO BANNER SÀN THƯƠNG MẠI ẨM THỰC PREMIUM */}
+      <div className="bg-gradient-to-br from-slate-900 via-orange-950 to-slate-900 py-16 px-4 relative overflow-hidden shadow-md">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#f97316_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <div className="max-w-4xl mx-auto text-center text-white relative z-10 space-y-4">
+          <span className="bg-orange-500/20 text-orange-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-orange-500/30">
+            ⚡ Siêu tốc giao hàng 15 phút
+          </span>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
+            Thèm gì là có - FoodExpress giao ngay <br />
+            Trong <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400">Chớp Mắt</span>
+          </h1>
+          <p className="text-slate-300 text-xs md:text-sm max-w-xl mx-auto font-medium leading-relaxed">
+            Khám phá tinh hoa ẩm thực, món ăn đặc sản, cơm văn phòng thơm ngon chuẩn vị được giao tận cửa phòng của bạn tại khu vực Long Bình.
+          </p>
           
-          {/* Ô Input Tìm kiếm */}
-          <div className="max-w-xl mx-auto relative shadow-xl rounded-2xl z-30">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setPage(0);
-                }}
-                placeholder="Tìm tên quán ăn hoặc tên món ăn ngon..."
-                className="w-full bg-white text-slate-800 pl-11 pr-4 py-3 rounded-2xl text-xs font-bold focus:outline-none placeholder-slate-400 border-2 border-transparent focus:border-slate-900 transition-all"
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-            </div>
-
-            {/* DROPDOWN BOX GỢI Ý MÓN ĂN KHI GÕ TỪ KHÓA */}
-            {showSuggestions && (
-              <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 text-left overflow-hidden z-50 animate-fadeIn">
-                <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                  <Utensils className="w-3 h-3 text-orange-500" /> Gợi ý từ khóa món ăn phù hợp
-                </div>
-                
-                <div className="divide-y divide-slate-50 max-h-48 overflow-y-auto">
-                  {mockSuggestedFoods.length > 0 ? (
-                    mockSuggestedFoods.map((food) => (
-                      <div 
-                        key={food.id}
-                        onClick={() => setSearchTerm(food.name)}
-                        className="p-3 hover:bg-orange-50/50 flex items-center justify-between cursor-pointer transition-colors group"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center text-orange-500">
-                            <Utensils className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-700 group-hover:text-orange-600 transition-colors">{food.name}</p>
-                            <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                              <Store className="w-2.5 h-2.5" /> {food.restaurant}
-                            </span>
-                          </div>
-                        </div>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-orange-500 transition-all transform group-hover:translate-x-1" />
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-xs text-slate-400">Không tìm thấy món ăn nào trùng khớp.</div>
-                  )}
-                </div>
+          {/* THANH TÌM KIẾM LỚN TRUNG TÂM */}
+          <div className="max-w-xl mx-auto pt-4">
+            <div className="relative shadow-2xl rounded-2xl bg-white p-1.5 flex items-center">
+              <div className="flex items-center flex-1 pl-3">
+                <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+                  placeholder="Tìm tên cửa hàng, trà sữa, gà rán ngon..."
+                  className="w-full bg-transparent text-slate-800 pl-3 pr-2 py-2 text-xs font-bold focus:outline-none placeholder:text-slate-400"
+                />
               </div>
-            )}
+              <button className="bg-orange-500 hover:bg-orange-600 text-white font-black text-xs px-6 py-2.5 rounded-xl transition-all shadow-md shrink-0 cursor-pointer">
+                Tìm kiếm
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* RENDER DANH SÁCH CỬA HÀNG ĐỐI TÁC */}
-      <div className="max-w-6xl mx-auto px-6 mt-10">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-            🍿 Danh sách cửa hàng ăn uống đối tác
-          </h2>
+      {/* DANH MỤC ẨM THỰC NHANH (QUICK CATEGORIES FILTERS) */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+          {([
+            { id: 'ALL', label: '🍱 Tất cả món', icon: Compass },
+            { id: 'PROMO', label: '🔥 Khuyến mãi siêu rẻ', icon: Flame },
+            { id: 'TRENDING', label: '👑 Quán phổ biến nhất', icon: Award },
+            { id: 'NEARBY', label: '🚀 Giao nhanh gần bạn', icon: Clock },
+            { id: 'RATING', label: '👍 Đánh giá 5 sao', icon: ThumbsUp }
+          ]).map((cat) => {
+            const IconComponent = cat.icon;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategoryFilter(cat.id)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black whitespace-nowrap border transition-all cursor-pointer shadow-xs ${
+                  activeCategoryFilter === cat.id 
+                    ? 'bg-orange-500 border-orange-500 text-white shadow-orange-500/10' 
+                    : 'bg-white border-slate-200/60 text-slate-600 hover:text-slate-800 hover:bg-slate-50'
+                }`}
+              >
+                <IconComponent className="w-3.5 h-3.5" />
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* KHU VỰC RENDER DANH SÁCH NHÀ HÀNG ĐỐI TÁC THỰC TẾ */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
+        <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+          <div>
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <Store className="w-4 h-4 text-orange-500" /> Gian hàng ăn uống đối tác chính thức
+            </h2>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide mt-0.5">Danh sách các quán ăn đang hoạt động thực tế trên hệ thống</p>
+          </div>
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-2" />
-            <p className="text-xs text-slate-400 font-bold">Đang lấy dữ liệu quán ăn...</p>
+          <div className="flex flex-col items-center justify-center py-20 gap-2">
+            <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+            <p className="text-xs text-slate-400 font-bold">Đang tải danh sách gian hàng...</p>
           </div>
         ) : isError ? (
-          <div className="text-center py-12 bg-red-50 text-red-600 rounded-2xl text-xs font-bold border border-red-100">
-            ❌ Lỗi kết nối máy chủ Backend. Vui lòng kiểm tra lại kết nối mạng!
+          <div className="text-center py-12 bg-red-50 text-red-600 rounded-3xl text-xs font-bold border border-red-100 shadow-xs max-w-xl mx-auto">
+            ❌ Không thể kết nối đến máy chủ máy chủ Backend. Vui lòng bật Server Spring Boot và thử lại!
           </div>
         ) : filteredRestaurants.length > 0 ? (
           <>
+            {/* GRID DANH SÁCH QUÁN ĂN */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredRestaurants.map((restaurant) => (
                 <RestaurantCard key={restaurant.restaurantId} restaurant={restaurant} />
               ))}
             </div>
 
-            {/* PHÂN TRANG (PAGINATION) CHUẨN ĐƯỢC TÍNH TỪ DATA BACKEND */}
+            {/* THANH ĐIỀU HƯỚNG PHÂN TRANG CHUẨN JPA TỪ BACKEND DATA */}
             {data && data.totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-12">
+              <div className="flex justify-center items-center gap-2 mt-12 border-t border-slate-100 pt-6">
                 <button
                   disabled={page === 0}
                   onClick={() => setPage(prev => Math.max(prev - 1, 0))}
-                  className="px-4 py-2 border rounded-xl bg-white text-xs font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Trước
                 </button>
-                <span className="text-xs font-black text-slate-700 mx-2">
+                <span className="text-xs font-black text-slate-500 mx-3">
                   Trang {page + 1} / {data.totalPages}
                 </span>
                 <button
                   disabled={page >= data.totalPages - 1}
                   onClick={() => setPage(prev => prev + 1)}
-                  className="px-4 py-2 border rounded-xl bg-white text-xs font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Sau
                 </button>
@@ -216,25 +239,26 @@ export default function Home() {
             )}
           </>
         ) : (
-          <div className="text-center py-16 bg-white border border-slate-100 rounded-3xl text-xs text-slate-400 font-medium">
-            Không tìm thấy nhà hàng nào phù hợp với từ khóa tìm kiếm của bạn.
+          <div className="text-center py-16 bg-white border border-slate-100 rounded-3xl text-xs text-slate-400 font-bold max-w-xl mx-auto shadow-xs">
+            🦖 Không tìm thấy nhà hàng nào phù hợp với từ khóa tìm kiếm hiện tại.
           </div>
         )}
       </div>
 
-      {/* NÚT GIỎ HÀNG NỔI (FLOATING CART) TỰ ĐỘNG HIỆN KHI CÓ MÓN ĂN */}
+      {/* NÚT FLOAT GIỎ HÀNG THÔNG MINH (FLOATING QUICK CART) */}
       {totalCartQuantity > 0 && (
         <button
           onClick={() => navigate('/cart')}
-          className="fixed bottom-6 right-6 bg-slate-900 text-white p-4 rounded-full shadow-2xl hover:bg-slate-800 transition-all transform hover:scale-105 active:scale-95 z-50 flex items-center gap-2 cursor-pointer group"
+          className="fixed bottom-6 right-6 bg-slate-900 hover:bg-orange-600 text-white pl-4 pr-5 py-3.5 rounded-full shadow-2xl transition-all transform hover:scale-105 active:scale-95 z-50 flex items-center gap-2.5 cursor-pointer group"
         >
           <div className="relative">
-            <ShoppingCart className="w-5 h-5 text-white" />
-            <span className="absolute -top-2.5 -right-2.5 bg-orange-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-slate-900 group-hover:bg-orange-600 transition-colors">
+            <ShoppingCart className="w-4 h-4 text-white" />
+            <span className="absolute -top-3.5 -right-3 bg-orange-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-slate-900 group-hover:bg-slate-900 transition-colors">
               {totalCartQuantity}
             </span>
           </div>
-          <span className="text-xs font-black pr-1 hidden sm:inline">Xem giỏ hàng</span>
+          <span className="text-xs font-black uppercase tracking-wider text-[11px]">Xem giỏ hàng hàng ngay</span>
+          <ArrowRight className="w-3.5 h-3.5 text-orange-400 group-hover:text-white transition-colors" />
         </button>
       )}
     </div>

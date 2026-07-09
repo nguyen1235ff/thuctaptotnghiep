@@ -63,7 +63,7 @@ export default function CustomerRestaurantView() {
 
   // Lọc danh sách món ăn theo thanh tìm kiếm và bộ lọc danh mục
   const filteredFoods = foods.filter(food => {
-    const matchSearch = food.name.toLowerCase().includes(foodSearch.toLowerCase());
+    const matchSearch = food.foodName.toLowerCase().includes(foodSearch.toLowerCase());
     const matchCategory = selectedCategoryId ? food.categoryId === selectedCategoryId : true;
     return matchSearch && matchCategory;
   });
@@ -200,9 +200,9 @@ export default function CustomerRestaurantView() {
                   const qty = getItemQuantity(food.foodId);
                   return (
                     <div key={food.foodId} className="bg-white border border-slate-100 p-3 rounded-2xl shadow-xs flex gap-3 items-center transition-all">
-                      <img src={food.image} alt={food.name} className="w-20 h-20 rounded-xl object-cover bg-slate-100 shrink-0" />
+                      <img src={food.imageUrl} alt={food.foodName} className="w-20 h-20 rounded-xl object-cover bg-slate-100 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-black text-slate-800 text-xs truncate">{food.name}</h3>
+                        <h3 className="font-black text-slate-800 text-xs truncate">{food.foodName}</h3>
                         <p className="text-[10px] text-slate-400 font-medium line-clamp-2 mt-0.5 leading-relaxed">{food.description}</p>
                         <span className="text-xs font-black text-orange-500 block mt-2">{formatCurrency(food.price)}</span>
                       </div>
@@ -215,7 +215,7 @@ export default function CustomerRestaurantView() {
                             <Plus className="w-4 h-4" />
                           </button>
                         ) : (
-                          <div className="flex items-center gap-2.5 bg-slate-100 px-2 py-1.5 rounded-xl border border-slate-200/40 text-xs font-black text-slate-800">
+                          <div className="flex items-center gap-2.5 bg-slate-100 px-2 py-1.5 rounsded-xl border border-slate-200/40 text-xs font-black text-slate-800">
                             <button onClick={() => removeFromCart(food.foodId)} className="text-slate-500 hover:text-slate-800 transition-colors p-0.5 cursor-pointer"><Minus className="w-3 h-3" /></button>
                             <span className="w-3 text-center select-none text-[11px]">{qty}</span>
                             <button onClick={() => addToCart(food, currentRestaurantName)} className="text-slate-500 hover:text-slate-800 transition-colors p-0.5 cursor-pointer"><Plus className="w-3 h-3" /></button>

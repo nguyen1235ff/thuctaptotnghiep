@@ -1,21 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api';
-import { authService } from '../services/auth';
+import { userService } from '../services/user'; // Import chuẩn dịch vụ user thay vì gọi trực tiếp api
 import { 
   User, Mail, Phone, Lock, KeyRound, LogOut, 
-  CheckCircle, Loader2, Edit2, ShieldAlert 
+  Loader2, Edit2 
 } from 'lucide-react';
-
-// 1. ĐỊNH NGHĨA DỮ LIỆU MOCK DATA PHÒNG TRƯỜNG HỢP BACKEND OFFLINE
-const MOCK_USER_PROFILE = {
-  fullName: 'Nguyễn Ngọc Vinh',
-  username: 'vinhndev',
-  email: 'vinhnguyen@gmail.com',
-  phone: '0987654321',
-  roles: ['ROLE_CUSTOMER']
-};
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -36,19 +26,10 @@ export default function Profile() {
   const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // 2. REACT QUERY: LẤY THÔNG TIN CÁ NHÂN TỪ API GET /users/profile
-  const { data: userInfo, isSuccess } = useQuery({
+  // 1. REACT QUERY: LẤY THÔNG TIN CÁ NHÂN TỪ API THỰC TẾ (Không dùng Mock Data)
+  const { data: userInfo, isLoading, isError } = useQuery({
     queryKey: ['userProfile'],
-    queryFn: async () => {
-      try {
-        const response = await api.get('/users/profile');
-        return response.data;
-      } catch (error) {
-        console.warn("⚠️ Backend offline hoặc lỗi kết nối. Kích hoạt Mock Data cho trang Profile.");
-        return MOCK_USER_PROFILE;
-      }
-    },
-    initialData: MOCK_USER_PROFILE // Dữ liệu mặc định ban đầu trong lúc đợi load hoặc khi lỗi
+    queryFn: () => userService.getProfile(), // Gọi hàm sạch từ service kết nối BE
   });
 
   // Đồng bộ dữ liệu từ API vào Form chỉnh sửa khi load thành công
@@ -59,24 +40,20 @@ export default function Profile() {
     }
   }, [userInfo]);
 
-  // 3. MUTATION: CẬP NHẬT THÔNG TIN CÁ NHÂN (API PUT /users/profile)
+  // 2. MUTATION: CẬP NHẬT THÔNG TIN CÁ NHÂN (API PUT /users/profile)
   const updateProfileMutation = useMutation({
-    mutationFn: async (updatedData: { fullName: string; phone: string }) => {
-      // Gọi đúng API PUT /users/profile trong UserController.java
-      const response = await api.put('/users/profile', updatedData);
-      return response.data;
-    },
+    mutationFn: (updatedData: { fullName: string; phone: string }) => 
+      userService.updateProfile(updatedData),
     onSuccess: (data) => {
       queryClient.setQueryData(['userProfile'], data);
       setProfileMessage({ type: 'success', text: '🎉 Cập nhật thông tin cá nhân thành công!' });
       setIsEditingProfile(false);
     },
     onError: (error: any) => {
-      console.error(error);
-      // Giả lập lưu thành công nếu BE offline giúp thông luồng test
-      queryClient.setQueryData(['userProfile'], (old: any) => ({ ...old, fullName, phone }));
-      setProfileMessage({ type: 'success', text: '🎉 [Giả lập] Cập nhật thông tin cá nhân thành công!' });
-      setIsEditingProfile(false);
+      setProfileMessage({ 
+        type: 'error', 
+        text: error?.response?.data?.message || '❌ Cập nhật thông tin thất bại. Vui lòng thử lại!' 
+      });
     }
   });
 
@@ -91,7 +68,7 @@ export default function Profile() {
     updateProfileMutation.mutate({ fullName, phone });
   };
 
-  // 4. XỬ LÝ ĐỔI MẬT KHẨU (API PUT /users/change-password)
+  // 3. XỬ LÝ ĐỔI MẬT KHẨU (API PUT /users/change-password)
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordMessage(null);
@@ -103,18 +80,17 @@ export default function Profile() {
 
     setIsLoadingPassword(true);
     try {
-      // Gọi đúng API PUT /users/change-password của UserController.java
-      await api.put('/users/change-password', { oldPassword, newPassword });
+      // Gọi đúng hàm put đồng bộ từ userService
+      await userService.changePassword({ oldPassword, newPassword });
       setPasswordMessage({ type: 'success', text: '🎉 Đổi mật khẩu thành công!' });
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
-      console.warn("⚠️ Không kết nối được BE, kích hoạt giả lập đổi mật khẩu thành công.");
-      setPasswordMessage({ type: 'success', text: '🎉 [Giả lập] Đổi mật khẩu thành công!' });
-      setOldPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      setPasswordMessage({ 
+        type: 'error', 
+        text: error?.response?.data?.message || '❌ Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu cũ!' 
+      });
     } finally {
       setIsLoadingPassword(false);
     }
@@ -129,6 +105,33 @@ export default function Profile() {
     navigate('/login');
   };
 
+  // Trạng thái Loading ban đầu khi chờ dữ liệu thực tế từ BE
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-9 h-9 text-orange-500 animate-spin" />
+        <p className="text-sm font-bold text-slate-400">Đang tải hồ sơ cá nhân...</p>
+      </div>
+    );
+  }
+
+  // Trạng thái Lỗi (ví dụ token hết hạn hoặc Server sập)
+  if (isError || !userInfo) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 gap-4">
+        <p className="text-sm font-bold text-red-500 text-center">
+          Phiên đăng nhập đã hết hạn hoặc không thể kết nối đến máy chủ!
+        </p>
+        <button onClick={handleLogout} className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold">
+          Đăng nhập lại
+        </button>
+      </div>
+    );
+  }
+
+  // Đọc danh sách vai trò từ localStorage đã lưu khi Login để hiển thị nhãn UI phù hợp
+  const storedRoles: string[] = JSON.parse(localStorage.getItem('roles') || '[]');
+
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -137,16 +140,16 @@ export default function Profile() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl border border-slate-100 shadow-xs gap-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-orange-500 flex items-center justify-center text-white text-2xl font-black shadow-md shadow-orange-500/20">
-              {userInfo?.fullName?.charAt(0).toUpperCase() || 'U'}
+              {userInfo.fullName?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-800 tracking-tight">{userInfo?.fullName}</h1>
+              <h1 className="text-xl font-black text-slate-800 tracking-tight">{userInfo.fullName}</h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs bg-slate-100 text-slate-600 font-bold px-2.5 py-0.5 rounded-md">
-                  @{userInfo?.username}
+                  @{userInfo.username}
                 </span>
                 <span className="text-xs bg-orange-50 text-orange-600 font-black px-2.5 py-0.5 rounded-md uppercase tracking-wider text-[10px]">
-                  {userInfo?.roles?.includes('ROLE_ADMIN') ? 'Quản trị viên' : userInfo?.roles?.includes('ROLE_OWNER') ? 'Chủ nhà hàng' : 'Khách hàng'}
+                  {storedRoles.includes('ROLE_ADMIN') ? 'Quản trị viên' : storedRoles.includes('ROLE_OWNER') ? 'Chủ nhà hàng' : 'Khách hàng'}
                 </span>
               </div>
             </div>
@@ -187,27 +190,25 @@ export default function Profile() {
             )}
 
             {!isEditingProfile ? (
-              // Trạng thái xem thông tin
               <div className="space-y-4">
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Họ và tên</span>
-                  <p className="text-sm font-bold text-slate-700 bg-slate-50 px-4 py-2.5 rounded-xl border border-transparent">{userInfo?.fullName}</p>
+                  <p className="text-sm font-bold text-slate-700 bg-slate-50 px-4 py-2.5 rounded-xl border border-transparent">{userInfo.fullName}</p>
                 </div>
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Địa chỉ Email</span>
                   <p className="text-sm font-bold text-slate-700 bg-slate-50 px-4 py-2.5 rounded-xl border border-transparent flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-slate-400" /> {userInfo?.email}
+                    <Mail className="w-4 h-4 text-slate-400" /> {userInfo.email}
                   </p>
                 </div>
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Số điện thoại</span>
                   <p className="text-sm font-bold text-slate-700 bg-slate-50 px-4 py-2.5 rounded-xl border border-transparent flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-slate-400" /> {userInfo?.phone || 'Chưa cập nhật'}
+                    <Phone className="w-4 h-4 text-slate-400" /> {userInfo.phone || 'Chưa cập nhật'}
                   </p>
                 </div>
               </div>
             ) : (
-              // Trạng thái Form chỉnh sửa sửa đổi thông tin (Gắn kết PUT /users/profile)
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Họ và tên mới</label>

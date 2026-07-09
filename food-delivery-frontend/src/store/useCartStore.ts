@@ -1,81 +1,108 @@
 import { create } from 'zustand';
-import type { CartItem, Food } from '../types';
+import { cartService, type CartResponse } from '../services/cart';
 
 interface CartState {
-  items: CartItem[];
+  // Giỏ hàng map theo restaurantId để FE quản lý phân tách các quán ăn dễ dàng
+  cart: Record<number, any[]>; 
+  totalPrice: number;
   voucherCode: string | null;
   discountType: 'PERCENTAGE' | 'FIXED_AMOUNT' | null;
-  discountValue: number; // Tỷ lệ % hoặc số tiền cố định được giảm
-  deliveryFee: number;   // Lấy từ thực tế của Nhà hàng
-  currentRestaurantId: number | null; // Rất quan trọng: Chỉ cho phép đặt món ở 1 nhà hàng mỗi lượt
-  addToCart: (food: Food, deliveryFee: number) => boolean; // Trả về true nếu thêm thành công, false nếu khác nhà hàng
-  removeFromCart: (foodId: number) => void;
-  updateQuantity: (foodId: number, quantity: number) => void;
+  discountValue: number;
+
+  // Các hàm tương tác trực tiếp với API Backend
+  fetchCart: () => Promise<void>;
+  addItemToCart: (data: { foodId: number; quantity: number }) => Promise<void>;
+  updateCartItem: (cartItemId: number, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
+  
+  // Các hàm tính toán phục vụ UI
   applyVoucher: (code: string, type: 'PERCENTAGE' | 'FIXED_AMOUNT', value: number) => void;
-  clearCart: () => void;
   getSubtotal: () => number;
   getDiscountAmount: () => number;
-  getFinalTotal: () => number;
+  getFinalTotal: (deliveryFee: number) => number;
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
-  items: [],
+  cart: {},
+  totalPrice: 0,
   voucherCode: null,
   discountType: null,
   discountValue: 0,
-  deliveryFee: 0,
-  currentRestaurantId: null,
 
-  addToCart: (food, deliveryFee) => {
-    const { items, currentRestaurantId } = get();
+  // Lấy dữ liệu giỏ hàng hiện tại từ Backend về lưu vào Store khi vừa vào App
+  fetchCart: async () => {
+    try {
+      const data = await cartService.getCart();
+      // Nhóm item theo restaurantId (Backend CartResponse có chứa thông tin item)
+      // Lưu ý: Đảm bảo CartItemResponse từ BE có trường restaurantId, nếu không có bạn có thể nhóm chung hoặc map từ danh sách
+      const groupCart: Record<number, any[]> = {};
+      
+      if (data.items && data.items.length > 0) {
+        // Tạm thời gom vào ID của quán hiện tại (Giỏ hàng Backend thiết kế theo User nên tại 1 thời điểm chỉ thuộc 1 quán)
+        // Giả lập lấy restaurantId từ item đầu tiên nếu BE trả về, hoặc mặc định gom nhóm
+        data.items.forEach(item => {
+          // Giả định Backend trả về restaurantId trong item, nếu không có ta mặc định lấy theo ngữ cảnh quán đang xem
+          const resId = (item as any).restaurantId || 1; 
+          if (!groupCart[resId]) groupCart[resId] = [];
+          groupCart[resId].push(item);
+        });
+      }
 
-    // Kiểm tra xem có đang đặt món ở nhà hàng khác không
-    if (currentRestaurantId !== null && currentRestaurantId !== food.restaurantId) {
-      return false; // Trả về false để UI hiển thị thông báo "Bạn có muốn xóa giỏ hàng cũ?"
-    }
-
-    const existingItem = items.find(item => item.food.foodId === food.foodId);
-    
-    if (existingItem) {
-      set({
-        items: items.map(item =>
-          item.food.foodId === food.foodId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
+      set({ 
+        cart: groupCart, 
+        totalPrice: data.totalPrice 
       });
-    } else {
-      set({
-        items: [...items, { food, quantity: 1 }],
-        currentRestaurantId: food.restaurantId,
-        deliveryFee: deliveryFee // Gán phí ship của chính nhà hàng đó luôn
-      });
+    } catch (error) {
+      console.error("Không thể lấy dữ liệu giỏ hàng từ BE:", error);
     }
-    return true;
   },
 
-  removeFromCart: (foodId) => set((state) => {
-    const nextItems = state.items.filter(item => item.food.foodId !== foodId);
-    return {
-      items: nextItems,
-      currentRestaurantId: nextItems.length === 0 ? null : state.currentRestaurantId
-    };
-  }),
-
-  updateQuantity: (foodId, quantity) => set((state) => {
-    if (quantity <= 0) {
-      const nextItems = state.items.filter(item => item.food.foodId !== foodId);
-      return {
-        items: nextItems,
-        currentRestaurantId: nextItems.length === 0 ? null : state.currentRestaurantId
-      };
+  addItemToCart: async (payload) => {
+    try {
+      const updatedCart = await cartService.addItemToCart(payload);
+      // Cập nhật lại state của store sau khi BE tính toán xong
+      const groupCart: Record<number, any[]> = {};
+      updatedCart.items.forEach(item => {
+        const resId = (item as any).restaurantId || 1;
+        if (!groupCart[resId]) groupCart[resId] = [];
+        groupCart[resId].push(item);
+      });
+      set({ cart: groupCart, totalPrice: updatedCart.totalPrice });
+    } catch (error) {
+      console.error("Lỗi thêm sản phẩm:", error);
+      throw error;
     }
-    return {
-      items: state.items.map(item =>
-        item.food.foodId === foodId ? { ...item, quantity } : item
-      )
-    };
-  }),
+  },
+
+  updateCartItem: async (cartItemId, quantity) => {
+    try {
+      let updatedCart;
+      if (quantity <= 0) {
+        updatedCart = await cartService.removeItemFromCart(cartItemId);
+      } else {
+        updatedCart = await cartService.updateCartItem(cartItemId, quantity);
+      }
+      
+      const groupCart: Record<number, any[]> = {};
+      updatedCart.items.forEach(item => {
+        const resId = (item as any).restaurantId || 1;
+        if (!groupCart[resId]) groupCart[resId] = [];
+        groupCart[resId].push(item);
+      });
+      set({ cart: groupCart, totalPrice: updatedCart.totalPrice });
+    } catch (error) {
+      console.error("Lỗi cập nhật số lượng:", error);
+    }
+  },
+
+  clearCart: async () => {
+    try {
+      await cartService.clearCart();
+      set({ cart: {}, totalPrice: 0, voucherCode: null, discountType: null, discountValue: 0 });
+    } catch (error) {
+      console.error("Lỗi xóa giỏ hàng:", error);
+    }
+  },
 
   applyVoucher: (code, type, value) => set({
     voucherCode: code,
@@ -83,35 +110,23 @@ export const useCartStore = create<CartState>((set, get) => ({
     discountValue: value
   }),
 
-  clearCart: () => set({ 
-    items: [], 
-    voucherCode: null, 
-    discountType: null, 
-    discountValue: 0, 
-    deliveryFee: 0, 
-    currentRestaurantId: null 
-  }),
-
   getSubtotal: () => {
-    return get().items.reduce((total, item) => total + (item.food.price * item.quantity), 0);
+    return get().totalPrice;
   },
 
   getDiscountAmount: () => {
     const subtotal = get().getSubtotal();
     const { discountType, discountValue } = get();
     if (!discountType) return 0;
-    
     if (discountType === 'PERCENTAGE') {
       return (subtotal * discountValue) / 100;
-    } else {
-      return discountValue; // FIXED_AMOUNT
     }
+    return discountValue;
   },
 
-  getFinalTotal: () => {
+  getFinalTotal: (deliveryFee: number) => {
     const subtotal = get().getSubtotal();
     const discount = get().getDiscountAmount();
-    const final = subtotal + get().deliveryFee - discount;
-    return final < 0 ? 0 : final;
+    return Math.max(0, subtotal + deliveryFee - discount);
   }
 }));

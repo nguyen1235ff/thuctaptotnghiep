@@ -1,6 +1,6 @@
 import { api } from './api';
 
-// Ánh xạ chính xác từ thực thể Category.java của Backend
+// Ánh xạ chính xác từ thực thể CategoryResponse của Backend
 export interface Category {
   categoryId: number;
   categoryName: string;
@@ -10,21 +10,15 @@ export interface Category {
 }
 
 export const categoryService = {
+  // 1. LẤY DANH SÁCH DANH MỤC MÓN CỦA NHÀ HÀNG (Trả về mảng phẳng trực tiếp)
+  // BE Endpoint: GET /categories/restaurant/{restaurantId}
   getByRestaurantId: async (restaurantId: number): Promise<Category[]> => {
-    try {
-      const response = await api.get<Category[]>(`/categories/restaurant/${restaurantId}`);
-      return response.data;
-    } catch (error) {
-      console.warn("Chưa kết nối được BE, trả về Mock Data danh mục:");
-      return [
-        { categoryId: 1, categoryName: "🍔 Món chính (Cơm Tấm)", description: "Các món cơm đĩa no bụng", displayOrder: 1 },
-        { categoryId: 2, categoryName: "🍲 Món canh / Gọi thêm", description: "Canh khổ qua, canh cải, trứng ốp la", displayOrder: 2 },
-        { categoryId: 3, categoryName: "🥤 Tráng miệng & Nước", description: "Trà sâm dứa, trà chanh, nước ngọt", displayOrder: 3 },
-      ];
-    }
+    const response = await api.get<Category[]>(`/categories/restaurant/${restaurantId}`);
+    return response.data; // Trả về mảng Category[] trực tiếp, không có .content
   },
 
-  // POST: /categories/{restaurantId}?categoryName=...
+  // 2. TẠO DANH MỤC MỚI CHO NHÀ HÀNG (Dành cho Chủ quán - Merchant)
+  // BE Endpoint: POST /categories/{restaurantId}?categoryName=...
   create: async (restaurantId: number, categoryName: string): Promise<Category> => {
     // Truyền dữ liệu qua Params theo cấu trúc @RequestParam của Spring Boot
     const response = await api.post<Category>(`/categories/${restaurantId}`, null, {
@@ -33,7 +27,8 @@ export const categoryService = {
     return response.data;
   },
 
-  // PUT: /categories/{id}?categoryName=...
+  // 3. CẬP NHẬT THÔNG TIN DANH MỤC
+  // BE Endpoint: PUT /categories/{id}?categoryName=...
   update: async (id: number, categoryName: string): Promise<Category> => {
     const response = await api.put<Category>(`/categories/${id}`, null, {
       params: { categoryName }
@@ -41,9 +36,9 @@ export const categoryService = {
     return response.data;
   },
 
-  // DELETE: /categories/{id}
-  delete: async (id: number): Promise<boolean> => {
+  // 4. XÓA DANH MỤC KHỎI NHÀ HÀNG
+  // BE Endpoint: DELETE /categories/{id}
+  delete: async (id: number): Promise<void> => {
     await api.delete(`/categories/${id}`);
-    return true;
   }
 };

@@ -5,8 +5,8 @@ import { restaurantService } from '../services/restaurant';
 import { useCartStore } from '../store/useCartStore'; // Chuyển sang sử dụng Zustand Store thực tế
 import RestaurantCard from '../components/RestaurantCard';
 import { 
-  Search, Loader2, ShoppingCart, User, LogIn, 
-  UserPlus, Utensils, Store, ArrowRight, LogOut,
+  Search, Loader2, ShoppingCart, User,
+  Store, ArrowRight, LogOut,
   Flame, Award, Clock, Compass, ThumbsUp
 } from 'lucide-react';
 

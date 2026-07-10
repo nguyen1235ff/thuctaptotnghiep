@@ -19,16 +19,21 @@ export default function Login() {
     try {
       const response = await authService.login({ username, password });
       
-      // Đồng bộ lưu thông tin xác thực sạch sẽ vào bộ nhớ trình duyệt
+      // Lưu token
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken || '');
-      localStorage.setItem('username', response.username);
-      localStorage.setItem('roles', JSON.stringify(response.roles));
-      
-      // ✅ Đã chuẩn hóa: Quét mảng chuỗi roles thực tế của máy chủ để điều hướng phân quyền
-      if (response.roles && response.roles.includes('ROLE_ADMIN')) {
+
+      // Lưu user info từ response.user (nested object)
+      const user = response.user;
+      localStorage.setItem('username', user.username);
+      localStorage.setItem('userId', String(user.userId));
+      localStorage.setItem('fullName', user.fullName);
+      localStorage.setItem('roles', JSON.stringify(user.roles));
+
+      // Backend roles không có prefix ROLE_: ["ADMIN"], ["CUSTOMER"], ["RESTAURANT"], ["SHIPPER"]
+      if (user.roles.includes('ADMIN')) {
         navigate('/admin');
-      } else if (response.roles && (response.roles.includes('ROLE_OWNER') || response.roles.includes('ROLE_RESTAURANT'))) {
+      } else if (user.roles.includes('RESTAURANT')) {
         navigate('/restaurant');
       } else {
         navigate('/');

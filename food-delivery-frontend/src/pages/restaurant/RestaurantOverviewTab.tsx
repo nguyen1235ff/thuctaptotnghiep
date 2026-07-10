@@ -4,7 +4,7 @@ import { restaurantService } from '../../services/restaurant';
 import type { RestaurantResponse } from '../../services/restaurant';
 import { 
   Store, Phone, MapPin, Mail, DollarSign, 
-  ShoppingBag, FileText, Image as ImageIcon, Save, CheckCircle2 
+  ShoppingBag, FileText, Image as ImageIcon, Save 
 } from 'lucide-react';
 
 interface RestaurantOverviewTabProps {

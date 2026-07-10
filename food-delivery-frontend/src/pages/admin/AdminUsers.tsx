@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userService } from '../../services/user';
-import { Shield, UserCheck, UserX, Search, Users } from 'lucide-react';
+import { Shield, UserCheck, UserX, Users } from 'lucide-react';
 
 export default function AdminUsers() {
   const queryClient = useQueryClient();

@@ -4,10 +4,9 @@ import type { Food } from '../services/food';
 
 interface MenuItemCardProps {
   food: Food;
-  deliveryFee: number;
 }
 
-export default function MenuItemCard({ food, deliveryFee }: MenuItemCardProps) {
+export default function MenuItemCard({ food }: MenuItemCardProps) {
   // Đồng bộ theo Zustand Store kết nối trực tiếp với DB Backend
   const cart = useCartStore((state) => state.cart);
   const addItemToCart = useCartStore((state) => state.addItemToCart);

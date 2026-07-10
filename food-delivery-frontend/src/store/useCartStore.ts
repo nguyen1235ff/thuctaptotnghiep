@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { cartService, type CartResponse } from '../services/cart';
+import { cartService } from '../services/cart';
 
 interface CartState {
   // Giỏ hàng map theo restaurantId để FE quản lý phân tách các quán ăn dễ dàng
@@ -50,7 +50,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       set({ 
         cart: groupCart, 
-        totalPrice: data.totalPrice 
+        totalPrice: data.subtotal 
       });
     } catch (error) {
       console.error("Không thể lấy dữ liệu giỏ hàng từ BE:", error);
@@ -67,7 +67,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         if (!groupCart[resId]) groupCart[resId] = [];
         groupCart[resId].push(item);
       });
-      set({ cart: groupCart, totalPrice: updatedCart.totalPrice });
+      set({ cart: groupCart, totalPrice: updatedCart.subtotal });
     } catch (error) {
       console.error("Lỗi thêm sản phẩm:", error);
       throw error;
@@ -89,7 +89,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         if (!groupCart[resId]) groupCart[resId] = [];
         groupCart[resId].push(item);
       });
-      set({ cart: groupCart, totalPrice: updatedCart.totalPrice });
+      set({ cart: groupCart, totalPrice: updatedCart.subtotal });
     } catch (error) {
       console.error("Lỗi cập nhật số lượng:", error);
     }

@@ -9,6 +9,7 @@ import org.mapstruct.Mapping;
 public interface FoodMapper {
 
     @Mapping(target = "categoryName", source = "category.categoryName")
+    @Mapping(target = "categoryId", source = "category.categoryId")
     @Mapping(target = "restaurantId", source = "restaurant.restaurantId")
     FoodResponse toFoodResponse(Food food);
 }

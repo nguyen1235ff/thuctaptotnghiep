@@ -90,7 +90,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // 1. THÊM MÓN MỚI VÀO GIỎ HÀNG (Khớp AddToCartRequest.java)
-  const addToCart = async (food: Food, resName: string) => {
+  const addToCart = async (food: Food, _resName: string) => {
     // Nếu đổi sang đặt món ở nhà hàng khác, tự động xóa sạch giỏ hàng cũ trên Database trước
     if (restaurantId && restaurantId !== food.restaurantId) {
       try {

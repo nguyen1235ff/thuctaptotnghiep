@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
-import { Mail, Lock, KeyRound, Loader2, ArrowLeft, CheckCircle, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, KeyRound, Loader2, ArrowLeft, ShieldCheck } from 'lucide-react';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();

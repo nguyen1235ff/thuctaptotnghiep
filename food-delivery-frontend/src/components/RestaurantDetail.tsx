@@ -111,7 +111,6 @@ export default function RestaurantDetail() {
               <MenuItemCard 
                 key={food.foodId} 
                 food={food} 
-                deliveryFee={restaurantInfo.deliveryFee} 
               />
             ))}
           </div>

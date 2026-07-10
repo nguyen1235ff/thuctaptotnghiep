@@ -131,6 +131,7 @@ public class AuthServiceImpl implements AuthService {
                     .refreshToken(refreshToken)
                     .tokenType("Bearer")
                     .expiresIn(3600L)
+                    .user(userMapper.toUserResponse(user))
                     .build();
 
         } catch (Exception ex) {
@@ -192,6 +193,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(newRefreshToken)
                 .tokenType("Bearer")
                 .expiresIn(3600L)
+                .user(userMapper.toUserResponse(user))
                 .build();
     }
 

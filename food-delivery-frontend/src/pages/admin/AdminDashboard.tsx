@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Utensils, ShieldAlert } from 'lucide-react';
+import { Users, Utensils } from 'lucide-react';
 import ManageRestaurants from './ManageRestaurants';
 import RestaurantDetailView from './RestaurantDetailView';
 

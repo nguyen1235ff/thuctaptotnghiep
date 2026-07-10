@@ -154,7 +154,7 @@ public class OrderServiceImpl implements OrderService {
 
         // Clear cart
         cartItemRepository.deleteAll(cart.getItems());
-        cart.setItems(null);
+        cart.getItems().clear();
         cart.setSubtotal(BigDecimal.ZERO);
         cart.setTotalItems(0);
         cartRepository.save(cart);

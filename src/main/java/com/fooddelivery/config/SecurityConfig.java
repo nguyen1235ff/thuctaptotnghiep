@@ -17,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -26,6 +27,7 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CorsConfigurationSource corsConfigurationSource;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -47,23 +49,30 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable())
-                .cors(cors -> {})
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/restaurants/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/foods/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/vouchers/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/reviews/restaurant/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/categories/restaurant/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
-                )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http
+            .csrf(csrf -> csrf.disable())
+            // Sử dụng CorsConfigurationSource bean từ CorsConfig (tránh duplicate)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(authz -> authz
+                    // Auth endpoints - public
+                    .requestMatchers("/auth/**").permitAll()
+                    // Public GET endpoints
+                    .requestMatchers(HttpMethod.GET, "/restaurants/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/foods/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/vouchers/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/reviews/restaurant/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/categories/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
+                    // Swagger/OpenAPI - public
+                    .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                    // Admin endpoints - role ADMIN only
+                    .requestMatchers("/admin/**").hasRole("ADMIN")
+                    // Tất cả còn lại - cần xác thực
+                    .anyRequest().authenticated()
+            )
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
